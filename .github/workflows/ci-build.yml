@@ -1,0 +1,70 @@
+name: CI Build
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["*"]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 5'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_DIR: ino/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get --assume-yes install xz-utils
+  
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        lfs: 'true'
+        fetch-depth: 0
+
+    - name: Setup
+      shell: bash
+      run: |
+        cd $BUILD_DIR
+        # From https://master.dl.sourceforge.net/project/arduino.mirror/1.8.16/arduino-1.8.16.tar.xz
+        file arduino-1.8.16.tar.xz
+        xz -d arduino-1.8.16.tar.xz
+        tar -xvf arduino-1.8.16.tar
+
+        # tar -xvf arduino-1.8.16.tar -C /opt
+        # cp boards.txt /opt/arduino-1.8.16/hardware/arduino/avr/
+        # cp -r Cytron_SSD1306 /opt/arduino-1.8.16/libraries/Cytron_SSD1306/
+        # cp -r SSD1306Ascii /opt/arduino-1.8.16/libraries/SSD1306Ascii/
+        # cp -r Adafruit_GFX_Library /opt/arduino-1.8.16/libraries/Adafruit_GFX_Library/
+        # cp -r Adafruit_SSD1306 /opt/arduino-1.8.16/libraries/Adafruit_SSD1306/
+        # cp -r Adafruit_BusIO /opt/arduino-1.8.16/libraries/Adafruit_BusIO/
+
+    - name: Build
+      shell: bash
+      run: |
+        cp ./trainings/hardware/trace/sketch.ino $BUILD_DIR
+        cd $BUILD_DIR
+        # ./build.sh
+        # export PATH=$GITHUB_WORKSPACE/hndtools-mipsel-linux-uclibc-4.2.3/bin:$PATH
+        arduino-1.8.16/arduino-builder -compile -logger=machine -hardware arduino-1.8.16/hardware \
+          -tools arduino-1.8.16/tools-builder -tools arduino-1.8.16/hardware/tools/avr \
+          -built-in-libraries arduino-1.8.16/libraries -fqbn=arduino:avr:atmega328bb -ide-version=10815 \
+          -warnings=none -prefs=build.warn_data_percentage=75 \
+          -prefs=runtime.tools.avrdude.path=arduino-1.8.16/hardware/tools/avr \
+          -prefs=runtime.tools.avrdude-6.3.0-arduino17.path=arduino-1.8.16/hardware/tools/avr \
+          -prefs=runtime.tools.avr-gcc.path=arduino-1.8.16/hardware/tools/avr \
+          -prefs=runtime.tools.avr-gcc-7.3.0-atmel3.6.1-arduino7.path=arduino-1.8.16/hardware/tools/avr \
+          -prefs=runtime.tools.arduinoOTA.path=arduino-1.8.16/hardware/tools/avr \
+          -prefs=runtime.tools.arduinoOTA-1.3.0.path=arduino-1.8.16/hardware/tools/avr \
+          -verbose *.ino
